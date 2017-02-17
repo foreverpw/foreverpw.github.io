@@ -1,0 +1,700 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="nodejs,transaction,mysql,continuation-local-storage," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="Nodes是单线程运行的，所有io操作是在另一个线程执行，处理完后通过回调函数通知nodejs线程，所以在dao层会出现回调，尤其是当一些业务逻辑或数据库操作需要顺序执行的时候，会产生层层回调，如何更好地复用代码，管理transaction，是一个问题。
+router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#123;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Nodejs Service,Dao,transaction设计">
+<meta property="og:url" content="http://yoursite.com/2017/02/16/node-transactional/index.html">
+<meta property="og:site_name" content="Pwiz">
+<meta property="og:description" content="Nodes是单线程运行的，所有io操作是在另一个线程执行，处理完后通过回调函数通知nodejs线程，所以在dao层会出现回调，尤其是当一些业务逻辑或数据库操作需要顺序执行的时候，会产生层层回调，如何更好地复用代码，管理transaction，是一个问题。
+router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#123;">
+<meta property="og:updated_time" content="2017-02-16T06:50:52.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Nodejs Service,Dao,transaction设计">
+<meta name="twitter:description" content="Nodes是单线程运行的，所有io操作是在另一个线程执行，处理完后通过回调函数通知nodejs线程，所以在dao层会出现回调，尤其是当一些业务逻辑或数据库操作需要顺序执行的时候，会产生层层回调，如何更好地复用代码，管理transaction，是一个问题。
+router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#123;">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2017/02/16/node-transactional/"/>
+
+
+
+
+
+  <title> Nodejs Service,Dao,transaction设计 | Pwiz </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">Pwiz</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+    
+      <p class="site-subtitle"></p>
+    
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="http://yoursite.com/2017/02/16/node-transactional/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="Pwiz">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.gif">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="Pwiz">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="Pwiz" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Nodejs Service,Dao,transaction设计
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-16T14:36:59+08:00">
+                2017-02-16
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Nodes是单线程运行的，所有io操作是在另一个线程执行，处理完后通过回调函数通知nodejs线程，所以在dao层会出现回调，尤其是当一些业务逻辑或数据库操作需要顺序执行的时候，会产生层层回调，如何更好地复用代码，管理<em>transaction</em>，是一个问题。</p>
+<h5 id="router"><a href="#router" class="headerlink" title="router"></a>router</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">router.get(<span class="string">'/add'</span>, <span class="keyword">async</span> <span class="function"><span class="keyword">function</span>(<span class="params">req, res, next</span>) </span>&#123;</div><div class="line">  <span class="keyword">try</span> &#123;</div><div class="line">    <span class="keyword">var</span> data = <span class="keyword">await</span> userService.addUser();</div><div class="line">    res.send(data)</div><div class="line">  &#125; <span class="keyword">catch</span> (error) &#123;</div><div class="line">    next(error);</div><div class="line">  &#125;</div><div class="line">&#125;);</div></pre></td></tr></table></figure>
+<p>router的回调是一个async方法，try catch 后，有error就调用<code>next(error);</code>让下个处理异常的<em>middleware</em>处理，没什么特别的</p>
+<h5 id="dao"><a href="#dao" class="headerlink" title="dao"></a>dao</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">const</span> sqls = &#123;</div><div class="line">    <span class="attr">insert</span>:<span class="string">'INSERT INTO user(id, name, age) VALUES(0,?,?)'</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="keyword">const</span> dao = &#123;</div><div class="line">    <span class="attr">add</span>: <span class="function"><span class="keyword">function</span> (<span class="params">name, age, connection</span>) </span>&#123;</div><div class="line">		<span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function"><span class="keyword">function</span>(<span class="params">resolve, reject</span>) </span>&#123;</div><div class="line">          connection.query(sqls.insert, [name,age], (err, data) =&gt; (err ? reject(err) : resolve(data)));</div><div class="line">        &#125;)</div><div class="line">	&#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = dao;</div></pre></td></tr></table></figure>
+<p>dao所有方法都返回一个promise，connection需要调用方传进来（<em>暂时没想到解决办法</em>），因为同一个transaction需要用同一个connection。</p>
+<h5 id="service"><a href="#service" class="headerlink" title="service"></a>service</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">const</span> userDao = <span class="built_in">require</span>(<span class="string">'../dao/userDao'</span>)</div><div class="line"><span class="keyword">const</span> dbHelper = <span class="built_in">require</span>(<span class="string">'../dao/dbHelper'</span>)</div><div class="line"></div><div class="line"><span class="keyword">const</span> service = &#123;&#125;</div><div class="line"></div><div class="line"><span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">addUser</span>(<span class="params">connection</span>)</span>&#123;</div><div class="line">    <span class="keyword">var</span> user1 = <span class="keyword">await</span> userDao.add(<span class="string">'pw'</span>,<span class="number">18</span>,connection);</div><div class="line">    <span class="keyword">var</span> user2 = <span class="keyword">await</span> userDao.add(<span class="string">'tangjianfeng'</span>,<span class="number">99</span>,connection);</div><div class="line">    <span class="keyword">return</span> &#123;<span class="attr">data</span>:<span class="string">'success'</span>&#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line">service.addUser = dbHelper.transactionProxy(addUser,service)</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = service;</div></pre></td></tr></table></figure>
+<p>想达到的效果是transaction统一加在每个service方法上，方法里任意地方抛错就<em>rollback</em>，有点java里spring的@transactional annotation的意思。首先定义addUser方法本身,他除了要接受router传进来的参数外，还要接受一个connection参数(会通过proxy的方式传进来)，将同一个connection传到不同的dao方法中，来控制transaction。</p>
+<p><code>service.addUser = dbHelper.transactionProxy(addUser,service)</code></p>
+<p>这句主要是给addUser方法加一层代理(实际router里调用的是proxy方法)。</p>
+<h5 id="dbHelper"><a href="#dbHelper" class="headerlink" title="dbHelper"></a>dbHelper</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">var</span> mysql = <span class="built_in">require</span>(<span class="string">'mysql'</span>);</div><div class="line"><span class="keyword">var</span> $conf = <span class="built_in">require</span>(<span class="string">'../conf/db'</span>);</div><div class="line"></div><div class="line"><span class="keyword">var</span> pool  = mysql.createPool($conf.mysql);</div><div class="line"></div><div class="line"><span class="keyword">const</span> helper = &#123;</div><div class="line">    startTransaction()&#123;</div><div class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function"><span class="keyword">function</span>(<span class="params">resolve, reject</span>) </span>&#123;</div><div class="line">            pool.getConnection(<span class="function"><span class="keyword">function</span>(<span class="params">err, connection</span>) </span>&#123;</div><div class="line">                <span class="keyword">if</span>(err)&#123; <span class="keyword">throw</span> err;&#125;</div><div class="line">                connection.beginTransaction(<span class="function"><span class="keyword">function</span>(<span class="params">err</span>) </span>&#123;</div><div class="line">                    <span class="keyword">if</span> (err) &#123; </div><div class="line">                        <span class="keyword">throw</span> err; </div><div class="line">                    &#125;<span class="keyword">else</span>&#123;</div><div class="line">                        resolve(connection)</div><div class="line">                    &#125;</div><div class="line">                &#125;)</div><div class="line">            &#125;)</div><div class="line">        &#125;)</div><div class="line">    &#125;,</div><div class="line">    transactionProxy(fn,context)&#123;</div><div class="line">        <span class="keyword">var</span> context = context || <span class="keyword">this</span>;</div><div class="line">        <span class="keyword">var</span> manage = <span class="keyword">this</span>;</div><div class="line">        <span class="keyword">return</span> <span class="keyword">async</span> <span class="function"><span class="keyword">function</span>(<span class="params"></span>)</span>&#123;</div><div class="line">            <span class="comment">//get connect and start transaction</span></div><div class="line">            <span class="keyword">try</span> &#123;</div><div class="line">                <span class="keyword">var</span> connection = <span class="keyword">await</span> manage.startTransaction();</div><div class="line">                <span class="keyword">var</span> arr = <span class="built_in">Array</span>.from(<span class="built_in">arguments</span>)</div><div class="line">                arr.push(connection)</div><div class="line">                <span class="keyword">var</span> result = <span class="keyword">await</span> fn.apply(context,arr)</div><div class="line"></div><div class="line">                <span class="comment">//commit</span></div><div class="line">                connection.commit(<span class="function"><span class="keyword">function</span>(<span class="params">err</span>) </span>&#123;</div><div class="line">                    <span class="keyword">if</span> (err) &#123;</div><div class="line">                        connection.rollback(<span class="function"><span class="keyword">function</span>(<span class="params"></span>) </span>&#123;</div><div class="line">                            <span class="keyword">throw</span> err;</div><div class="line">                        &#125;);</div><div class="line">                    &#125;</div><div class="line">                &#125;)</div><div class="line"></div><div class="line">                <span class="keyword">return</span> result;</div><div class="line">            &#125; <span class="keyword">catch</span>(error)&#123;</div><div class="line">                connection.rollback();</div><div class="line">                <span class="keyword">throw</span> error</div><div class="line">            &#125; <span class="keyword">finally</span> &#123;</div><div class="line">                connection.release()</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = helper;</div></pre></td></tr></table></figure>
+<p>dbHelper是关键<strong><em>transactionProxy</em></strong>方法可以给fn外面包了一层，这一层主要作用是：</p>
+<ol>
+<li>从connectionPool中拿到拿到一个connection</li>
+<li>connection开启transaction</li>
+<li>将这个connection作为额外参数传给fn方法，并调用fn方法</li>
+<li>拿到result后commit</li>
+<li>try catch住，有异常就rollback</li>
+<li>最后finally中release connection</li>
+</ol>
+<h5 id="好处"><a href="#好处" class="headerlink" title="好处"></a>好处</h5><ul>
+<li>使用promise async await的写法，没有嵌套的回调，代码可读性强，易于维护</li>
+<li>transaction加在service层，这样dao层的方法可以复用(不用担心transaction)</li>
+<li>写法简单，重复的 <code>beginTransaction</code> <code>commit</code> <code>rollback</code> 以及dao层的异常处理都可以统一放到<code>transactionProxy</code>中去处理。</li>
+</ul>
+<h5 id="不足"><a href="#不足" class="headerlink" title="不足"></a>不足</h5><ul>
+<li>connection需要显示地传递，有依赖，解决思路是如何不需要传递connection,就能使得dao的方法使用同一个connection。</li>
+</ul>
+<hr>
+<h4 id="decorator-version"><a href="#decorator-version" class="headerlink" title="decorator version"></a>decorator version</h4><h5 id="service-1"><a href="#service-1" class="headerlink" title="service"></a>service</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">const</span> userDao = <span class="built_in">require</span>(<span class="string">'../../dao/userDao/userDao'</span>)</div><div class="line"><span class="keyword">const</span> transactional = <span class="built_in">require</span>(<span class="string">'../../dao/dbHelper'</span>).transactional</div><div class="line"></div><div class="line"><span class="class"><span class="keyword">class</span> <span class="title">LoginService</span> </span>&#123;</div><div class="line">  @transactional</div><div class="line">  <span class="keyword">async</span> getUserInfo(userId,session,connection)&#123;</div><div class="line">    <span class="keyword">var</span> user = <span class="keyword">await</span> userDao.queryById(userId,connection);</div><div class="line">    <span class="keyword">return</span> user</div><div class="line">  &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = LoginService</div></pre></td></tr></table></figure>
+<h5 id="dbHelper-1"><a href="#dbHelper-1" class="headerlink" title="dbHelper"></a>dbHelper</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line">helper.transactional = <span class="function"><span class="keyword">function</span> (<span class="params">target, name, descriptor</span>) </span>&#123;</div><div class="line">  <span class="keyword">let</span> originMethod = descriptor.value;</div><div class="line">  <span class="keyword">let</span> newMethod = <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</div><div class="line">    <span class="comment">//get connect and start transaction</span></div><div class="line">    <span class="keyword">try</span> &#123;</div><div class="line">      <span class="keyword">var</span> connection = <span class="keyword">await</span> helper.startTransaction();</div><div class="line">      <span class="keyword">var</span> arr = <span class="built_in">Array</span>.from(<span class="built_in">arguments</span>)</div><div class="line">      arr.push(connection)</div><div class="line">      <span class="keyword">var</span> result = <span class="keyword">await</span> originMethod.apply(target, arr)</div><div class="line"></div><div class="line">      <span class="comment">//commit</span></div><div class="line">      connection.commit(<span class="function"><span class="keyword">function</span> (<span class="params">err</span>) </span>&#123;</div><div class="line">        <span class="keyword">if</span> (err) &#123;</div><div class="line">          connection.rollback(<span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</div><div class="line">            <span class="keyword">throw</span> err;</div><div class="line">          &#125;);</div><div class="line">        &#125;</div><div class="line">      &#125;)</div><div class="line"></div><div class="line">      <span class="keyword">return</span> result;</div><div class="line">    &#125; <span class="keyword">catch</span> (error) &#123;</div><div class="line">      connection.rollback();</div><div class="line">      <span class="keyword">throw</span> error</div><div class="line">    &#125; <span class="keyword">finally</span> &#123;</div><div class="line">      connection.release()</div><div class="line">    &#125;</div><div class="line">  &#125;</div><div class="line">  descriptor.value = newMethod;</div><div class="line">  <span class="keyword">return</span> descriptor;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>原理一样只是把之前的<strong><em>transactionProxy</em></strong>改成了decorator方式实现，类似java annotation，<strong>service</strong>里的代码更简洁了。</p>
+<hr>
+<h4 id="continuation-local-storage-version"><a href="#continuation-local-storage-version" class="headerlink" title="continuation-local-storage version"></a>continuation-local-storage version</h4><p><a href="https://github.com/othiym23/node-continuation-local-storage" target="_blank" rel="external"><strong>continuation-local-storage</strong></a>的作用相当于java里的ThreadLocal,不同的是它是基于链式回调，而不是真正的thread(nodejs是单线程的)。使用<strong>continuation-local-storage</strong>,我们可以在整个链式回调方法的生命周期里，get、set该回调链独有的变量值，于是就可以做到不显示的传递connection，而在整个transaction里使用同一个connection了。</p>
+<h5 id="service-2"><a href="#service-2" class="headerlink" title="service"></a>service</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">const</span> UserDao = <span class="built_in">require</span>(<span class="string">'../../dao/userDao/userDao'</span>)</div><div class="line"><span class="keyword">const</span> transactional = <span class="built_in">require</span>(<span class="string">'../../dao/dbHelper'</span>).transactional</div><div class="line"></div><div class="line"><span class="keyword">var</span> userDao = <span class="keyword">new</span> UserDao()</div><div class="line"></div><div class="line"><span class="class"><span class="keyword">class</span> <span class="title">LoginService</span> </span>&#123;</div><div class="line">  @transactional</div><div class="line">  <span class="keyword">async</span> getUserInfo(userId,session)&#123;</div><div class="line">    <span class="keyword">var</span> user = <span class="keyword">await</span> userDao.queryById(userId);</div><div class="line">    <span class="keyword">return</span> user</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  @transactional</div><div class="line">  <span class="keyword">async</span> addUsers(userName,session)&#123;</div><div class="line">    <span class="keyword">var</span> user = <span class="keyword">await</span> userDao.add(userName,<span class="number">11</span>);</div><div class="line">    <span class="keyword">var</span> user = <span class="keyword">await</span> userDao.add(userName,<span class="number">12</span>);</div><div class="line">    <span class="keyword">return</span> user</div><div class="line">  &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = LoginService</div></pre></td></tr></table></figure>
+<p>service里只是把之前所有传递的connection去掉了。</p>
+<h5 id="dao-1"><a href="#dao-1" class="headerlink" title="dao"></a>dao</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">const</span> connection = <span class="built_in">require</span>(<span class="string">'../../dao/dbHelper'</span>).connection</div><div class="line"></div><div class="line"><span class="keyword">const</span> sqls = &#123;</div><div class="line">  <span class="attr">insert</span>: <span class="string">'INSERT INTO user(id, name, age) VALUES(0,?,?)'</span>,</div><div class="line">  <span class="attr">queryById</span>: <span class="string">'select * from user where id=?'</span>,</div><div class="line">  <span class="attr">queryByName</span>: <span class="string">'select * from user where name=?'</span>,</div><div class="line">  <span class="attr">queryAll</span>: <span class="string">'select * from user'</span></div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="class"><span class="keyword">class</span> <span class="title">UserDao</span> </span>&#123;</div><div class="line">  @connection</div><div class="line">  get connection ()&#123;&#125;</div><div class="line"></div><div class="line">  queryById (id) &#123;</div><div class="line">    <span class="keyword">var</span> id = +id; <span class="comment">// 为了拼凑正确的sql语句，这里要转下整数</span></div><div class="line">    <span class="keyword">var</span> self = <span class="keyword">this</span>;</div><div class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function"><span class="keyword">function</span> (<span class="params">resolve, reject</span>) </span>&#123;</div><div class="line">      self.connection.query(sqls.queryById, id, (err, data) =&gt; (err ? reject(err) : resolve(data)));</div><div class="line">    &#125;)</div><div class="line">  &#125;</div><div class="line"></div><div class="line">  add (name, age) &#123;</div><div class="line">    <span class="keyword">var</span> self = <span class="keyword">this</span>;</div><div class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function"><span class="keyword">function</span> (<span class="params">resolve, reject</span>) </span>&#123;</div><div class="line">      <span class="keyword">if</span>(name == <span class="string">'daxianyu'</span> &amp;&amp; age == <span class="number">12</span>)&#123;</div><div class="line">        <span class="keyword">return</span> reject(<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">'daxianyu forbidden'</span>))</div><div class="line">      &#125;</div><div class="line">      self.connection.query(sqls.insert, [name, age], (err, data) =&gt; (err ? reject(err) : 				resolve(data)));</div><div class="line">    &#125;)</div><div class="line">  &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = UserDao;</div></pre></td></tr></table></figure>
+<p>dao改写成了class，因为需要加<em>@connection</em> decorator，@connection改写了connection属性的<strong>get</strong>方法,拿到当前回调链中定义的connection。</p>
+<h5 id="dbHelper-2"><a href="#dbHelper-2" class="headerlink" title="dbHelper"></a>dbHelper</h5><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">var</span> mysql = <span class="built_in">require</span>(<span class="string">'mysql'</span>);</div><div class="line"><span class="keyword">var</span> $conf = <span class="built_in">require</span>(<span class="string">'../conf/db'</span>);</div><div class="line"><span class="keyword">var</span> asyncLocal = <span class="built_in">require</span>(<span class="string">'continuation-local-storage'</span>);</div><div class="line"></div><div class="line"><span class="keyword">var</span> pool = mysql.createPool($conf.mysql);</div><div class="line"><span class="keyword">var</span> connectionLocal = asyncLocal.createNamespace(<span class="string">'connectionLocal'</span>);</div><div class="line"><span class="keyword">var</span> connectionName = <span class="string">'connection'</span>;</div><div class="line"></div><div class="line"><span class="keyword">const</span> helper = &#123;</div><div class="line">  startTransaction() &#123;</div><div class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function"><span class="keyword">function</span> (<span class="params">resolve, reject</span>) </span>&#123;</div><div class="line">      pool.getConnection(<span class="function"><span class="keyword">function</span> (<span class="params">err, connection</span>) </span>&#123;</div><div class="line">        <span class="keyword">if</span> (err) &#123; <span class="keyword">throw</span> err; &#125;</div><div class="line">        connection.beginTransaction(<span class="function"><span class="keyword">function</span> (<span class="params">err</span>) </span>&#123;</div><div class="line">          <span class="keyword">if</span> (err) &#123;</div><div class="line">            <span class="keyword">throw</span> err;</div><div class="line">          &#125; <span class="keyword">else</span> &#123;</div><div class="line">            resolve(connection)</div><div class="line">          &#125;</div><div class="line">        &#125;)</div><div class="line">      &#125;)</div><div class="line">    &#125;)</div><div class="line">  &#125;</div><div class="line">&#125;</div><div class="line"></div><div class="line">helper.transactional = <span class="function"><span class="keyword">function</span> (<span class="params">target, name, descriptor</span>) </span>&#123;</div><div class="line">  <span class="keyword">let</span> originMethod = descriptor.value;</div><div class="line">  <span class="keyword">let</span> newMethod = <span class="keyword">async</span> <span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</div><div class="line">    <span class="comment">//get connect and start transaction</span></div><div class="line">    <span class="keyword">try</span> &#123;</div><div class="line">      <span class="keyword">let</span> context = connectionLocal.createContext();</div><div class="line">      connectionLocal.enter(context);</div><div class="line">      <span class="keyword">var</span> connection = <span class="keyword">await</span> helper.startTransaction();</div><div class="line">      connectionLocal.set(connectionName, connection);</div><div class="line">      <span class="keyword">var</span> arr = <span class="built_in">Array</span>.from(<span class="built_in">arguments</span>)</div><div class="line">      arr.push(connection)</div><div class="line">      <span class="keyword">var</span> result = <span class="keyword">await</span> originMethod.apply(target, arr)</div><div class="line"></div><div class="line">      <span class="comment">//commit</span></div><div class="line">      connection.commit(<span class="function"><span class="keyword">function</span> (<span class="params">err</span>) </span>&#123;</div><div class="line">        <span class="keyword">if</span> (err) &#123;</div><div class="line">          connection.rollback(<span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</div><div class="line">            <span class="keyword">throw</span> err;</div><div class="line">          &#125;);</div><div class="line">        &#125;</div><div class="line">      &#125;)</div><div class="line"></div><div class="line">      <span class="keyword">return</span> result;</div><div class="line">    &#125; <span class="keyword">catch</span> (error) &#123;</div><div class="line">      connection.rollback();</div><div class="line">      <span class="keyword">throw</span> error</div><div class="line">    &#125; <span class="keyword">finally</span> &#123;</div><div class="line">      connection.release()</div><div class="line">    &#125;</div><div class="line">  &#125;</div><div class="line">  descriptor.value = newMethod;</div><div class="line">  <span class="keyword">return</span> descriptor;</div><div class="line">&#125;</div><div class="line"></div><div class="line">helper.connection = <span class="function"><span class="keyword">function</span> (<span class="params">target, name, descriptor</span>)</span>&#123;</div><div class="line">  descriptor.get = <span class="function"><span class="keyword">function</span>(<span class="params"></span>) </span>&#123;</div><div class="line">    <span class="keyword">return</span> connectionLocal.get(connectionName);</div><div class="line">  &#125;</div><div class="line">  <span class="keyword">return</span> descriptor;</div><div class="line">&#125;</div><div class="line"></div><div class="line"><span class="built_in">module</span>.exports = helper;</div></pre></td></tr></table></figure>
+<p><em>@transaction</em> decorator改写了一下，在开启transaction前加入了下面几行代码：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">let</span> context = connectionLocal.createContext();</div><div class="line">connectionLocal.enter(context);</div><div class="line">...</div><div class="line">connectionLocal.set(connectionName, connection);</div></pre></td></tr></table></figure>
+<p>开启一个新的context，把当前transaction连接保存到当前的<strong>connectionLocal</strong>中，之后的回调链中都能拿到同一个connection。</p>
+<p><em>@connection</em> decorator改写了<strong>get</strong>方法,返回当前<strong>connectionLocal</strong>中保存的connection。</p>
+<p>这样<strong>service</strong>、<strong>dao</strong>的写法就十分简单，通过<em>@transactional</em>、<em>@connection</em>，两个decorator就可以控制事务。</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/nodejs/" rel="tag"># nodejs</a>
+          
+            <a href="/tags/transaction/" rel="tag"># transaction</a>
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/continuation-local-storage/" rel="tag"># continuation-local-storage</a>
+          
+        </div>
+      
+
+      
+        
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/02/14/node-callback/" rel="next" title="Nodejs解决回调地狱">
+                <i class="fa fa-chevron-left"></i> Nodejs解决回调地狱
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+          
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.gif"
+               alt="Pwiz" />
+          <p class="site-author-name" itemprop="name">Pwiz</p>
+           
+              <p class="site-description motion-element" itemprop="description"></p>
+          
+        </div>
+        <nav class="site-state motion-element">
+        
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">3</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">6</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-5"><a class="nav-link" href="#router"><span class="nav-number">1.</span> <span class="nav-text">router</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dao"><span class="nav-number">2.</span> <span class="nav-text">dao</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#service"><span class="nav-number">3.</span> <span class="nav-text">service</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dbHelper"><span class="nav-number">4.</span> <span class="nav-text">dbHelper</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#好处"><span class="nav-number">5.</span> <span class="nav-text">好处</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#不足"><span class="nav-number">6.</span> <span class="nav-text">不足</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#decorator-version"><span class="nav-number"></span> <span class="nav-text">decorator version</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#service-1"><span class="nav-number">1.</span> <span class="nav-text">service</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dbHelper-1"><span class="nav-number">2.</span> <span class="nav-text">dbHelper</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#continuation-local-storage-version"><span class="nav-number"></span> <span class="nav-text">continuation-local-storage version</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#service-2"><span class="nav-number">1.</span> <span class="nav-text">service</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dao-1"><span class="nav-number">2.</span> <span class="nav-text">dao</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dbHelper-2"><span class="nav-number">3.</span> <span class="nav-text">dbHelper</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Pwiz</span>
+</div>
+
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Muse
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+  
+  
+
+  
+
+  
+
+  
+
+  
+
+
+</body>
+</html>
