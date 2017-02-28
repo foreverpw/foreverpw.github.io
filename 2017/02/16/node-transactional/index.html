@@ -71,7 +71,7 @@
 <link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
 
 
-  <meta name="keywords" content="nodejs,transaction,mysql,continuation-local-storage," />
+  <meta name="keywords" content="nodejs,js,transaction,mysql,continuation-local-storage," />
 
 
 
@@ -95,7 +95,7 @@ router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#
 <meta property="og:site_name" content="Pwiz">
 <meta property="og:description" content="Nodes是单线程运行的，所有io操作是在另一个线程执行，处理完后通过回调函数通知nodejs线程，所以在dao层会出现回调，尤其是当一些业务逻辑或数据库操作需要顺序执行的时候，会产生层层回调，如何更好地复用代码，管理transaction，是一个问题。
 router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#123;">
-<meta property="og:updated_time" content="2017-02-22T10:18:22.000Z">
+<meta property="og:updated_time" content="2017-02-28T09:20:07.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Nodejs Service, Dao, transaction设计">
 <meta name="twitter:description" content="Nodes是单线程运行的，所有io操作是在另一个线程执行，处理完后通过回调函数通知nodejs线程，所以在dao层会出现回调，尤其是当一些业务逻辑或数据库操作需要顺序执行的时候，会产生层层回调，如何更好地复用代码，管理transaction，是一个问题。
@@ -392,6 +392,8 @@ router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#
           
             <a href="/tags/nodejs/" rel="tag"># nodejs</a>
           
+            <a href="/tags/js/" rel="tag"># js</a>
+          
             <a href="/tags/transaction/" rel="tag"># transaction</a>
           
             <a href="/tags/mysql/" rel="tag"># mysql</a>
@@ -418,6 +420,10 @@ router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/02/28/javascript-interview/" rel="prev" title="javascript-interview">
+                javascript-interview <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -489,7 +495,7 @@ router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-count">4</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
@@ -500,7 +506,7 @@ router12345678router.get(&apos;/add&apos;, async function(req, res, next) &amp;#
           
             <div class="site-state-item site-state-tags">
               <a href="/tags">
-                <span class="site-state-item-count">6</span>
+                <span class="site-state-item-count">8</span>
                 <span class="site-state-item-name">tags</span>
               </a>
             </div>
