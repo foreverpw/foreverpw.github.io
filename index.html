@@ -246,6 +246,135 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="http://pwiz.me/2017/03/03/js-number-precision/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="Pwiz">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.gif">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="Pwiz">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="Pwiz" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2017/03/03/js-number-precision/" itemprop="url">
+                  javascript中的数字
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-03-03T15:23:07+08:00">
+                2017-03-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <p>javascript中的数字其实都是浮点数表示的，toFixed，小数相加，整数相加都会丢失精度：</p>
+<blockquote>
+<p>9007199254740992 + 1 = 9007199254740992</p>
+<p>9007199254740992 + 2 = 9007199254740994</p>
+</blockquote>
+<h4 id="IEEE浮点表示法"><a href="#IEEE浮点表示法" class="headerlink" title="IEEE浮点表示法"></a>IEEE浮点表示法</h4><p>javascript使用的是IEEE 754 64位的浮点表示法，格式如下：<br>| s | e | f |<br>| :–: | :——: | :——: |<br>| 1bit |  11 bit  |  52bit   |<br>浮点数表示标准形式：V = (-1)^s×M×2^E，拆开各种情况公式如下：<br>| (−1)^<em>s</em> × %1.<em>f</em> × 2^(<em>e</em>−(2^10-1)) | normalized, 0 &lt; <em>e</em> &lt; 2^11-1   |<br>| ———————————— | —————————— |<br>| (−1)^<em>s</em> × %0.<em>f</em> × 2^(<em>e</em>−(2^10-1)) | denormalized, <em>e</em> = 0, <em>f</em> &gt; 0 |<br>| (−1)^<em>s</em> × 0                         | <em>e</em> = 0, <em>f</em> = 0               |<br>| NaN                                  | <em>e</em> = 2^11-1, <em>f</em> &gt; 0          |<br>| infinity                             | <em>e</em> = 2^11-1, <em>f</em> = 0          |</p>
+<p>M = 1.f 或 0.f，所以精度就由f决定，当把10进制数字转成浮点数时，首先要转成<strong>1.f</strong>或<strong>0.f</strong>的二进制结构，当转换成上面结构后的二进制数字精度大于（52+1）位时就会产生精度丢失的情况（不够表示了）</p>
+<h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h4><p>先升幂再降幂：<br><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">function</span> <span class="title">add</span>(<span class="params">num1, num2</span>)</span>&#123;</div><div class="line">  <span class="keyword">let</span> r1, r2, m;</div><div class="line">  r1 = (<span class="string">''</span>+num1).split(<span class="string">'.'</span>)[<span class="number">1</span>].length;</div><div class="line">  r2 = (<span class="string">''</span>+num2).split(<span class="string">'.'</span>)[<span class="number">1</span>].length;</div><div class="line"></div><div class="line">  m = <span class="built_in">Math</span>.pow(<span class="number">10</span>,<span class="built_in">Math</span>.max(r1,r2));</div><div class="line">  <span class="keyword">return</span> (num1 * m + num2 * m) / m;</div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+<p>toFixed修复：<br><figure class="highlight javascript"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// toFixed 修复</span></div><div class="line"><span class="function"><span class="keyword">function</span> <span class="title">toFixed</span>(<span class="params">num, s</span>) </span>&#123;</div><div class="line">    <span class="keyword">var</span> times = <span class="built_in">Math</span>.pow(<span class="number">10</span>, s)</div><div class="line">    <span class="keyword">var</span> des = num * times + <span class="number">0.5</span></div><div class="line">    des = <span class="built_in">parseInt</span>(des, <span class="number">10</span>) / times</div><div class="line">    <span class="keyword">return</span> des + <span class="string">''</span></div><div class="line">&#125;</div></pre></td></tr></table></figure></p>
+
+          
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
   <link itemprop="mainEntityOfPage" href="http://pwiz.me/2017/02/28/unknown-css/">
 
   <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -729,7 +858,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">3</span>
+                <span class="site-state-item-count">4</span>
                 <span class="site-state-item-name">posts</span>
               </a>
             </div>
